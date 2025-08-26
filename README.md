@@ -26,8 +26,8 @@ This repo is intentionally lightweight so you can **get a leads CSV in one comma
 
 ```bash
 # 1) Clone
-git clone https://github.com/<you>/google-places-text-to-csv.git
-cd google-places-text-to-csv
+git clone https://github.com/<you>/google-places-to-csv.git
+cd google-places-to-csv
 
 # 2) (Optional) create venv
 python3 -m venv .venv && source .venv/bin/activate
