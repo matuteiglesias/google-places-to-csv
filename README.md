@@ -168,3 +168,15 @@ Use of Google Places data is governed by Google’s Terms. You’re responsible 
 ## License
 
 MIT (suggested). Add a `LICENSE` file if you plan to keep it open source.
+
+---
+
+**Search phrases**
+
+* Google Places API text search to CSV
+* Export Google Maps places to CSV/JSON
+* Places API v1 `nextPageToken` pagination
+* `X-Goog-FieldMask` examples (displayName, websiteUri, rating, openingHours)
+* Lead list from Google Places
+* Local SEO data extraction with Places API
+
