@@ -14,7 +14,6 @@ This repo is intentionally lightweight so you can **get a leads CSV in one comma
 
 ## Features
 
-* **One-file CLI** (`text_runner.py`) — no framework overhead.&#x20;
 * **Pagination** with `nextPageToken` (auto backoff between pages).&#x20;
 * **Field masks** via `X-Goog-FieldMask`, with a sensible default you can override.&#x20;
 * **CSV/JSON output** to a `data/` folder with consistent filenames.&#x20;
@@ -50,12 +49,7 @@ python data/text_runner.py --query "restaurants in Buenos Aires" --format csv
 ## Usage
 
 ```bash
-python data/text_runner.py \
-  --query "restaurants in Buenos Aires" \
-  --format csv \
-  --max-pages 5 \
-  --language-code es \
-  --region-code AR
+python -m gmaps_scraper.cli --query "restaurants in Buenos Aires"
 ```
 
 * `--query` (repeatable): Add multiple queries by repeating the flag
@@ -95,17 +89,18 @@ The tool automatically prepends `nextPageToken` so pagination still works.&#x20;
 **Multiple queries in one run**
 
 ```bash
-python data/text_runner.py \
-  --query "dentist palermo" \
-  --query "pediatra belgrano" \
-  --format csv --max-pages 3
+python -m gmaps_scraper.cli \
+  --query "restaurants in Almagro, Buenos Aires" \
+  --max-pages 3 \
+  --format both
+
 ```
 
 **JSON output and custom fields**
 
 ```bash
-python data/text_runner.py \
-  --query "cafes recoleta" \
+python -m gmaps_scraper.cli \
+  --query "restaurants in Almagro, Buenos Aires" \
   --format json \
   --fields "places.displayName,places.formattedAddress,places.location,places.googleMapsUri"
 ```
@@ -127,7 +122,7 @@ Columns are generated from the requested field mask. Nested objects are flattene
 ## Install notes
 
 * Python 3.9+ recommended.
-* Only dependency is `requests`. If you keep the repo minimal:
+* Only dependency is `requests`.
 
   ```
   pip install requests
