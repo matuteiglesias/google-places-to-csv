@@ -111,19 +111,20 @@ GOOGLE_SPEC = ProviderSpec(
 OPENMART_SPEC = ProviderSpec(
     key="openmart",
     label="Openmart Local Business API",
-    docs_url="https://www.openmart.com/product-tutorials/using-the-openmart-api-to-fetch-data",
+    docs_url="https://app.openmart.com/api-docs/search-businesses",
     terms_url="https://www.openmart.com/products/local-business-data-api",
     policy_verified_on="2026-09-07",
     persistence_mode="provider-documented-lead-generation",
     persistence_summary=(
-        "Openmart's current product documentation explicitly markets the API for B2B lead "
-        "generation and states that returned structured JSON may be stored and used. Verify "
-        "the terms attached to your account before production use."
+        "Openmart's current product/API documentation explicitly positions business search "
+        "for lead-list workflows and states that returned structured data may be used/stored. "
+        "Verify the terms attached to your account before production use."
     ),
     durable_identifier="openmart_id",
     capabilities=(
         "text-search",
         "structured-area",
+        "cursor-pagination",
         "persistent-business-record",
         "lead-generation",
         "normalized-business-record",
