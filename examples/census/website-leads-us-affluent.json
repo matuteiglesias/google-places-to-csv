@@ -5,24 +5,24 @@
   "page_size": 50,
   "max_pages": 1,
   "cells": [
-    {"label": "greenwich-cosmetic-dentists", "query": "cosmetic dentist", "city": "Greenwich", "state": "CT", "country": "US"},
-    {"label": "greenwich-med-spas", "query": "medical spa", "city": "Greenwich", "state": "CT", "country": "US"},
-    {"label": "greenwich-remodelers", "query": "kitchen and bath remodeler", "city": "Greenwich", "state": "CT", "country": "US"},
-    {"label": "greenwich-estate-law", "query": "estate planning attorney", "city": "Greenwich", "state": "CT", "country": "US"},
+    {"label": "greenwich-cosmetic-dentists", "query": "cosmetic dentist", "city": "Greenwich", "state": "CT", "country": "USA"},
+    {"label": "greenwich-med-spas", "query": "medical spa", "city": "Greenwich", "state": "CT", "country": "USA"},
+    {"label": "greenwich-remodelers", "query": "kitchen and bath remodeler", "city": "Greenwich", "state": "CT", "country": "USA"},
+    {"label": "greenwich-estate-law", "query": "estate planning attorney", "city": "Greenwich", "state": "CT", "country": "USA"},
 
-    {"label": "arlington-cosmetic-dentists", "query": "cosmetic dentist", "city": "Arlington", "state": "VA", "country": "US"},
-    {"label": "arlington-med-spas", "query": "medical spa", "city": "Arlington", "state": "VA", "country": "US"},
-    {"label": "arlington-remodelers", "query": "kitchen and bath remodeler", "city": "Arlington", "state": "VA", "country": "US"},
-    {"label": "arlington-estate-law", "query": "estate planning attorney", "city": "Arlington", "state": "VA", "country": "US"},
+    {"label": "arlington-cosmetic-dentists", "query": "cosmetic dentist", "city": "Arlington", "state": "VA", "country": "USA"},
+    {"label": "arlington-med-spas", "query": "medical spa", "city": "Arlington", "state": "VA", "country": "USA"},
+    {"label": "arlington-remodelers", "query": "kitchen and bath remodeler", "city": "Arlington", "state": "VA", "country": "USA"},
+    {"label": "arlington-estate-law", "query": "estate planning attorney", "city": "Arlington", "state": "VA", "country": "USA"},
 
-    {"label": "irvine-cosmetic-dentists", "query": "cosmetic dentist", "city": "Irvine", "state": "CA", "country": "US"},
-    {"label": "irvine-med-spas", "query": "medical spa", "city": "Irvine", "state": "CA", "country": "US"},
-    {"label": "irvine-remodelers", "query": "kitchen and bath remodeler", "city": "Irvine", "state": "CA", "country": "US"},
-    {"label": "irvine-estate-law", "query": "estate planning attorney", "city": "Irvine", "state": "CA", "country": "US"},
+    {"label": "irvine-cosmetic-dentists", "query": "cosmetic dentist", "city": "Irvine", "state": "CA", "country": "USA"},
+    {"label": "irvine-med-spas", "query": "medical spa", "city": "Irvine", "state": "CA", "country": "USA"},
+    {"label": "irvine-remodelers", "query": "kitchen and bath remodeler", "city": "Irvine", "state": "CA", "country": "USA"},
+    {"label": "irvine-estate-law", "query": "estate planning attorney", "city": "Irvine", "state": "CA", "country": "USA"},
 
-    {"label": "scottsdale-cosmetic-dentists", "query": "cosmetic dentist", "city": "Scottsdale", "state": "AZ", "country": "US"},
-    {"label": "scottsdale-med-spas", "query": "medical spa", "city": "Scottsdale", "state": "AZ", "country": "US"},
-    {"label": "scottsdale-remodelers", "query": "kitchen and bath remodeler", "city": "Scottsdale", "state": "AZ", "country": "US"},
-    {"label": "scottsdale-estate-law", "query": "estate planning attorney", "city": "Scottsdale", "state": "AZ", "country": "US"}
+    {"label": "scottsdale-cosmetic-dentists", "query": "cosmetic dentist", "city": "Scottsdale", "state": "AZ", "country": "USA"},
+    {"label": "scottsdale-med-spas", "query": "medical spa", "city": "Scottsdale", "state": "AZ", "country": "USA"},
+    {"label": "scottsdale-remodelers", "query": "kitchen and bath remodeler", "city": "Scottsdale", "state": "AZ", "country": "USA"},
+    {"label": "scottsdale-estate-law", "query": "estate planning attorney", "city": "Scottsdale", "state": "AZ", "country": "USA"}
   ]
 }
