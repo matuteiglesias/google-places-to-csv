@@ -1,180 +1,160 @@
 # google-places-to-csv
 
-Minimal CLI to turn **Google Places API v1 Text Search** results into clean **CSV/JSON files**.
-Supports field masks, pagination via `nextPageToken`, multi-query runs, and standardized filenames.
+Small, maintenance-mode CLI for exporting **Google Places API Text Search (New)** results to normalized CSV and/or raw JSON.
 
-> [!WARNING]
-> **Maintenance/cost notice (verified 2026-09-07):** the repository's current default masks are not a cheap baseline. The package CLI requests fields that trigger **Text Search Enterprise**; the legacy root `text_runner.py` additionally requests `reviews` / `reviewSummary`, which trigger **Enterprise + Atmosphere**. Before a paid run, use an explicit field mask and verify the applicable SKU. A consolidation and pricing-aware hardening plan is recorded in [`docs/API_CONTRACT_AUDIT_2026-09-07.md`](docs/API_CONTRACT_AUDIT_2026-09-07.md).
-
-* Input: one or more text queries (e.g., `restaurants in Buenos Aires`, `dentist palermo`, `barber 11211`)
-* Output: `./data/places_text_<slug(query)>_<YYYYMMDD_HHMMSS>.csv|json`
-* Auth: API key via `GOOGLE_PLACES_API_KEY` env var
-* Defaults: robust field mask including name, address, phones, website, ratings, hours, price level, reviews
-
-This repo is intentionally lightweight so you can **get a leads CSV in one command**.
-
----
-
-## Features
-
-* **Pagination** with `nextPageToken` (auto backoff between pages).&#x20;
-* **Field masks** via `X-Goog-FieldMask`, with a sensible default you can override.&#x20;
-* **CSV/JSON output** to a `data/` folder with consistent filenames.&#x20;
-* **Column flattening** for nested fields and lists (joins list values for easier Excel/BI use).&#x20;
-
----
-
-## Quick start
-
-```bash
-# 1) Clone
-git clone https://github.com/<you>/google-places-to-csv.git
-cd google-places-to-csv
-
-# 2) (Optional) create venv
-python3 -m venv .venv && source .venv/bin/activate
-
-# 3) Install deps
-pip install -r requirements.txt  # only 'requests' if you keep it lean
-
-# 4) Set your API key
-export GOOGLE_PLACES_API_KEY="YOUR_KEY"
-
-# 5) Run
-python data/text_runner.py --query "restaurants in Buenos Aires" --format csv
-```
-
-> On Windows (PowerShell):
-> `setx GOOGLE_PLACES_API_KEY "YOUR_KEY"` then open a new shell.
-
----
-
-## Usage
+The canonical entry point is:
 
 ```bash
 python -m gmaps_scraper.cli --query "restaurants in Buenos Aires"
 ```
 
-* `--query` (repeatable): Add multiple queries by repeating the flag
-* `--format`: `csv` (default) or `json`
-* `--max-pages`: default 5 (respects Places `nextPageToken`)
-* `--language-code` / `--region-code`: pass through to the API
-* `--fields`: override the default response field mask
+The repository intentionally stays narrow: official Places API access, explicit field masks, bounded pagination, deterministic output, and cost-aware defaults. It is not a web scraper, CRM, or general Google Cloud billing tool.
 
-All outputs are written under `./data/` with timestamped filenames.&#x20;
+## Why the default changed
 
----
+Google bills Text Search (New) according to the **highest SKU triggered by any field in the response field mask**. A seemingly convenient default containing ratings, websites, hours, or reviews can therefore raise every successful search request into a more expensive tier.
 
-## Default fields (FieldMask)
+As of the contract verification on **2026-09-07**:
 
-By default the script requests a comprehensive set of fields so your CSV is useful out of the box:
+- `rating`, `userRatingCount`, `websiteUri`, phone, opening-hours, and price fields trigger **Text Search Enterprise**;
+- `reviews` and `reviewSummary` trigger **Text Search Enterprise + Atmosphere**;
+- the default `core` profile contains only IDs-only + Pro fields and therefore triggers **Text Search Pro**.
 
-```
-places.id,places.name,places.displayName,places.formattedAddress,
-places.location,places.types,places.primaryType,places.businessStatus,
-places.googleMapsUri,places.primaryTypeDisplayName,places.plusCode,
-places.addressComponents,places.shortFormattedAddress,places.viewport,
-places.pureServiceAreaBusiness,places.containingPlaces,
-places.internationalPhoneNumber,places.websiteUri,
-places.rating,places.userRatingCount,
-places.currentOpeningHours,places.regularOpeningHours,
-places.priceLevel,places.priceRange,
-places.reviews,places.reviewSummary
-```
+Authoritative references:
 
-You can replace it with `--fields "<comma list>"`.
-The tool automatically prepends `nextPageToken` so pagination still works.&#x20;
+- https://developers.google.com/maps/documentation/places/web-service/text-search
+- https://developers.google.com/maps/billing-and-pricing/sku-details
+- https://developers.google.com/maps/billing-and-pricing/pricing
 
----
+Google can change field classifications and pricing. The CLI reports the highest tier implied by its dated local map before making a network request; custom fields absent from that map are reported as **UNCLASSIFIED**, never assumed cheap.
 
-## Examples
-
-**Multiple queries in one run**
+## Quick start
 
 ```bash
+git clone https://github.com/matuteiglesias/google-places-to-csv.git
+cd google-places-to-csv
+
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install -r requirements.txt
+
+export GOOGLE_PLACES_API_KEY="YOUR_KEY"
 python -m gmaps_scraper.cli \
-  --query "restaurants in Almagro, Buenos Aires" \
-  --max-pages 3 \
+  --query "restaurants in Buenos Aires" \
+  --max-pages 1 \
+  --format csv
+```
+
+The package also accepts `GOOGLE_API_KEY`. Do not commit API keys or billing credentials.
+
+## Cost-aware profiles
+
+Choose at most one of `--profile` and `--fields`.
+
+| Profile | Intended use | Highest current Text Search SKU |
+| --- | --- | --- |
+| `ids` | IDs/resource names only | Essentials (IDs Only) |
+| `core` | useful search CSV baseline | Pro |
+| `enterprise` | core + rating/contact/hours/price | Enterprise |
+| `atmosphere` | enterprise + reviews | Enterprise + Atmosphere |
+
+`core` is the default.
+
+Examples:
+
+```bash
+# Cheapest discovery shape
+python -m gmaps_scraper.cli \
+  --query "cafes in Almagro, Buenos Aires" \
+  --profile ids \
+  --max-pages 1
+
+# Default useful baseline: Pro
+python -m gmaps_scraper.cli \
+  --query "cafes in Almagro, Buenos Aires" \
+  --profile core \
   --format both
 
+# Explicitly opt in to higher-cost contact/rating/hour fields
+python -m gmaps_scraper.cli \
+  --query "cafes in Almagro, Buenos Aires" \
+  --profile enterprise
+
+# Explicitly opt in to reviews / Atmosphere fields
+python -m gmaps_scraper.cli \
+  --query "cafes in Almagro, Buenos Aires" \
+  --profile atmosphere
 ```
 
-**JSON output and custom fields**
+## Expert custom field masks
+
+`--fields` bypasses the named profiles while keeping the same SKU preflight:
 
 ```bash
 python -m gmaps_scraper.cli \
   --query "restaurants in Almagro, Buenos Aires" \
-  --format json \
-  --fields "places.displayName,places.formattedAddress,places.location,places.googleMapsUri"
+  --fields "places.displayName,places.formattedAddress,places.location,places.googleMapsUri" \
+  --max-pages 1
 ```
 
----
+The tool normalizes and de-duplicates the mask and includes `nextPageToken` for pagination. Nested masks such as `places.displayName.text` are classified through their documented top-level billable field.
 
-## How pagination works
+Wildcard masks (`*` / `places.*`) and fields that are not in the dated local classification map produce an unmistakable **UNCLASSIFIED** warning. The CLI does not attempt to estimate your dollar bill because actual spend depends on current Google pricing, monthly volume, region, contracts, and future changes.
 
-The script posts to `places:searchText`, collects `places[]`, and uses `nextPageToken` to fetch subsequent pages with a small delay (≈2.1s) until the token disappears or `--max-pages` is reached.&#x20;
+## CLI
 
----
+```text
+--query / -q        One Text Search query (required)
+--profile           ids | core | enterprise | atmosphere
+--fields            Expert comma-separated field-mask override
+--max-pages         1..3, default 3
+--language-code     Optional Places language code
+--region-code       Optional Places region code
+--out-dir           Output directory, default ./out
+--format            csv | json | both, default csv
+```
 
-## Output schema (CSV)
+Text Search (New) currently returns at most 60 results across all pages. This client therefore caps `--max-pages` at 3.
 
-Columns are generated from the requested field mask. Nested objects are flattened to strings; lists are joined with commas or semicolons. This keeps the CSV friendly for spreadsheets while retaining key details.&#x20;
+## Output contract
 
----
+CSV output uses the requested fields to create deterministic, analysis-friendly columns. Common nested structures such as location, address components, opening hours, and price ranges are expanded where supported by the normalizer.
 
-## Install notes
+Raw JSON output is the list of returned Place objects. With `--format both`, CSV and raw JSON are produced from the same query and field selection.
 
-* Python 3.9+ recommended.
-* Only dependency is `requests`.
+Generated files go under `./out/` unless `--out-dir` is supplied. `out/` is ignored by Git.
 
-  ```
-  pip install requests
-  ```
+## Transport behavior
 
----
+The client:
 
-## Pricing, quotas & SKUs (read me before scaling)
+- posts to `https://places.googleapis.com/v1/places:searchText`;
+- requires an explicit response field mask;
+- follows `nextPageToken` using `pageToken`;
+- bounds requests to at most three pages;
+- retries only explicit retryable HTTP responses (`429`, `500`, `502`, `503`, `504`), with bounded backoff;
+- does **not** automatically retry ambiguous network exceptions, because the server may already have received a billable request.
 
-Google Places bills by **SKU** depending on which fields you request. If you only need IDs, you can request `places.id` / `places.name` (ID-only SKU). Rich fields like `rating`, `openingHours`, or `reviews` move you into **Pro/Enterprise** SKUs. Trim your `--fields` in production to control cost. (The CLI lets you swap masks per run.)
+There is no automatic Place Details enrichment pass.
 
----
+## Tests
 
-## Troubleshooting
+Normal tests require no Google credentials and no network access:
 
-* **HTTP 400 – invalid field**: You likely requested a field not available for `searchText`. Remove/adjust your `--fields`.
-* **HTTP 403/401**: Check the API key, enable **Places API** for your project, ensure billing is active.
-* **Only 20 results**: Raise `--max-pages` and let the script paginate; if results are exhausted, the API stops returning a token.
-* **CSV columns missing**: The Places API only returns fields you explicitly ask for in the field mask; add them via `--fields`.
+```bash
+python -m unittest discover -s tests -v
+```
 
----
+CI runs the offline contract suite on Python 3.10 and 3.12 with Places API key variables explicitly blank.
 
-## Roadmap
+## Legacy entry point
 
-* Optional **Nearby Search** mode (circle or viewport bias)
-* **Place Details** enrichment by place ID (second pass)
-* Native **Parquet** / **NDJSON** output
-* Simple **dedup** cache by `places.id`
+`python text_runner.py ...` remains only as a compatibility shim and prints a deprecation notice. It delegates directly to the canonical package CLI and contains no independent API or billing logic.
 
----
+Prefer `python -m gmaps_scraper.cli` in all new usage.
 
-## Legal
+## Lifecycle
 
-Use of Google Places data is governed by Google’s Terms. You’re responsible for respecting **usage limits, quotas, and attribution**. This tool is a thin client around the official API and **does not scrape** web pages.
+This repository is in `maintenance` state. See [`LIFECYCLE.md`](LIFECYCLE.md) and the dated [`API contract audit`](docs/API_CONTRACT_AUDIT_2026-09-07.md).
 
----
-
-## License
-
-MIT (suggested). Add a `LICENSE` file if you plan to keep it open source.
-
----
-
-**Search phrases**
-
-* Google Places API text search to CSV
-* Export Google Maps places to CSV/JSON
-* Places API v1 `nextPageToken` pagination
-* `X-Goog-FieldMask` examples (displayName, websiteUri, rating, openingHours)
-* Lead list from Google Places
-* Local SEO data extraction with Places API
-
+Before a paid production run, verify the current Google endpoint, requested fields/SKU, quotas, legal/attribution requirements, and that the run is intentionally authorized to incur charges.
