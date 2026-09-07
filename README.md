@@ -65,7 +65,8 @@ export GOOGLE_PLACES_API_KEY="YOUR_KEY"
 
 local-business-discover \
   --query "roofers" \
-  --center "32.7767,-96.7970" \
+  --latitude 32.7767 \
+  --longitude -96.7970 \
   --radius-m 10000 \
   --output-contract refs \
   --format json
@@ -91,7 +92,8 @@ Default usage returns a common `BusinessRecord` shape:
 ```bash
 local-business-discover \
   --query "cafes" \
-  --center "-34.6037,-58.3816" \
+  --latitude -34.6037 \
+  --longitude -58.3816 \
   --radius-m 5000 \
   --profile core \
   --output-contract business \
@@ -192,8 +194,9 @@ No adapter should be implemented until a real workflow/user makes its semantics 
 --provider          google (current implementation)
 --profile           ids | core | enterprise | atmosphere
 --fields            Expert Google field-mask override
---center            Optional LAT,LNG search-bias center
---radius-m          Radius paired with --center; Google supports 0..50000
+--latitude          Optional search-bias center latitude
+--longitude         Optional search-bias center longitude
+--radius-m          Radius paired with latitude/longitude; Google supports 0..50000
 --output-contract   business | refs | provider
 --max-pages         1..3, default 1
 --language-code     Optional Google language code
@@ -202,7 +205,7 @@ No adapter should be implemented until a real workflow/user makes its semantics 
 --format            csv | json | both, default csv
 ```
 
-`--output-contract refs` intentionally rejects expensive/custom field selections because those fields do not change the durable identity handoff.
+The three geographic arguments must be supplied together. `--output-contract refs` intentionally rejects expensive/custom field selections because those fields do not change the durable identity handoff.
 
 ## Transport behavior
 
