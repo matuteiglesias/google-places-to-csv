@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import tempfile
 import unittest
 from pathlib import Path
@@ -36,7 +37,14 @@ class FakeProvider:
         capabilities=("text-search",),
     )
 
+    def __init__(self, *, fail_query: str | None = None) -> None:
+        self.fail_query = fail_query
+        self.calls: list[str] = []
+
     def search(self, request):
+        self.calls.append(request.query)
+        if request.query == self.fail_query:
+            raise RuntimeError("synthetic provider failure")
         if request.query == "dentist":
             return [
                 {"id": "loc_1", "company_name": "One"},
@@ -81,6 +89,7 @@ class CensusTests(unittest.TestCase):
             with patch("gmaps_scraper.census.get_provider", return_value=fake):
                 manifest = run_plan(PLAN, out_dir=tmpdir, max_total_requests=5)
 
+            self.assertEqual(manifest["status"], "complete")
             self.assertEqual(manifest["unique_records"], 3)
             self.assertEqual(manifest["membership_rows"], 4)
             run_dirs = list(Path(tmpdir).iterdir())
@@ -89,6 +98,68 @@ class CensusTests(unittest.TestCase):
             self.assertTrue((run_dir / "businesses.csv").exists())
             self.assertTrue((run_dir / "membership.csv").exists())
             self.assertTrue((run_dir / "manifest.json").exists())
+            self.assertTrue((run_dir / "checkpoint.json").exists())
+
+    def test_completed_cell_is_checkpointed_before_later_failure(self) -> None:
+        fake = FakeProvider(fail_query="medical spa")
+        with tempfile.TemporaryDirectory() as tmpdir:
+            with patch("gmaps_scraper.census.get_provider", return_value=fake):
+                with self.assertRaisesRegex(RuntimeError, "synthetic provider failure"):
+                    run_plan(PLAN, out_dir=tmpdir, max_total_requests=5)
+
+            run_dir = next(Path(tmpdir).iterdir())
+            manifest = json.loads((run_dir / "manifest.json").read_text(encoding="utf-8"))
+            checkpoint = json.loads((run_dir / "checkpoint.json").read_text(encoding="utf-8"))
+            self.assertEqual(manifest["status"], "failed")
+            self.assertEqual(manifest["completed_cells"], 1)
+            self.assertEqual(manifest["unique_records"], 2)
+            self.assertEqual(manifest["failed_cell"]["label"], "b")
+            self.assertIn("synthetic provider failure", manifest["last_error"])
+            self.assertEqual(len(checkpoint["unique_rows"]), 2)
+            self.assertEqual(len(checkpoint["cell_results"]), 1)
+            self.assertTrue((run_dir / "businesses.csv").exists())
+            self.assertTrue((run_dir / "membership.csv").exists())
+
+    def test_resume_skips_checkpointed_cells_and_finishes_run(self) -> None:
+        failing = FakeProvider(fail_query="medical spa")
+        with tempfile.TemporaryDirectory() as tmpdir:
+            with patch("gmaps_scraper.census.get_provider", return_value=failing):
+                with self.assertRaises(RuntimeError):
+                    run_plan(PLAN, out_dir=tmpdir, max_total_requests=5)
+
+            run_dir = next(Path(tmpdir).iterdir())
+            resumed = FakeProvider()
+            with patch("gmaps_scraper.census.get_provider", return_value=resumed):
+                manifest = run_plan(
+                    PLAN,
+                    out_dir=tmpdir,
+                    max_total_requests=5,
+                    resume_run=run_dir,
+                )
+
+            self.assertEqual(resumed.calls, ["medical spa"])
+            self.assertEqual(manifest["status"], "complete")
+            self.assertEqual(manifest["completed_cells"], 2)
+            self.assertEqual(manifest["unique_records"], 3)
+            self.assertEqual(manifest["membership_rows"], 4)
+
+    def test_resume_rejects_changed_plan(self) -> None:
+        failing = FakeProvider(fail_query="medical spa")
+        with tempfile.TemporaryDirectory() as tmpdir:
+            with patch("gmaps_scraper.census.get_provider", return_value=failing):
+                with self.assertRaises(RuntimeError):
+                    run_plan(PLAN, out_dir=tmpdir, max_total_requests=5)
+            run_dir = next(Path(tmpdir).iterdir())
+            changed = dict(PLAN)
+            changed["name"] = "different"
+            with patch("gmaps_scraper.census.get_provider", return_value=FakeProvider()):
+                with self.assertRaisesRegex(SystemExit, "plan hash does not match"):
+                    run_plan(
+                        changed,
+                        out_dir=tmpdir,
+                        max_total_requests=5,
+                        resume_run=run_dir,
+                    )
 
     def test_dry_run_does_not_create_outputs(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
