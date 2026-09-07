@@ -84,7 +84,7 @@ Current Google service-specific terms allow caching Google ID values such as Pla
 
 ## 2. Single-query Openmart discovery
 
-For a persistent business/prospecting dataset, use a provider whose documented data-use contract fits that purpose. Openmart's current public product documentation explicitly markets its Local Business API for B2B lead generation and says returned structured JSON may be stored and used; users should still verify the terms attached to their account.
+For a persistent business/prospecting dataset, use a provider whose documented data-use contract fits that purpose. Openmart's current public API/product documentation explicitly positions business search for building lead lists and persistent local-business workflows; users should still verify the terms attached to their account.
 
 ```bash
 export OPENMART_API_KEY="YOUR_KEY"
@@ -94,7 +94,7 @@ local-business-discover \
   --query "cosmetic dentist" \
   --city Greenwich \
   --state CT \
-  --country US \
+  --country USA \
   --page-size 50 \
   --output-contract business \
   --format both
@@ -110,7 +110,7 @@ The provider-neutral `BusinessRecord` can contain, where returned:
 - website;
 - phone;
 - rating / review count;
-- provider URL;
+- provider-supplied reference URL where available;
 - source-query provenance.
 
 Missing fields remain empty; the kernel does not manufacture values.
@@ -225,7 +225,9 @@ Implemented providers:
 ### Openmart Local Business API
 
 - query + optional `GeoArea(city, state, country)`;
-- bounded offset pagination, maximum page size 100;
+- current documented top-level `limit` request shape and opaque cursor pagination;
+- local page-size safety cap of 100 (preview-key compatible and the provider's current recommended typical size), even though some account types may support larger pages;
+- current documented response normalization from top-level `id` + nested `content`;
 - normalized business record / Openmart identity;
 - persistence mode recorded as `provider-documented-lead-generation` based on current public provider documentation;
 - no automatic people enrichment, paid contact unlocking, or outreach.
@@ -265,7 +267,7 @@ Openmart-specific:
 --city
 --state
 --country
---page-size         1..100
+--page-size         local safety cap 1..100
 ```
 
 Provider-specific arguments are rejected when used with the wrong adapter rather than silently ignored.
@@ -286,13 +288,13 @@ Google Text Search:
 Openmart:
 
 - POST `https://api.openmart.ai/api/v1/search`;
-- API key from `OPENMART_API_KEY`;
-- structured city/state/country location when supplied;
-- bounded offset pagination;
-- default 50 / maximum 100 records per page in this adapter;
+- API key from `OPENMART_API_KEY`, sent using the current recommended Bearer authorization form;
+- structured city/state/country location as the documented location-array request shape;
+- opaque cursor pagination using the last result cursor;
+- default 50 / local safety cap 100 records per page;
 - one-page default, maximum three pages;
 - bounded explicit HTTP retry behavior;
-- no people/contact enrichment beyond fields already returned by the business-search response.
+- no people/contact enrichment beyond business-search fields already returned by the provider.
 
 ## Compliance boundary
 
