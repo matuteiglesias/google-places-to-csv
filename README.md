@@ -20,6 +20,8 @@ As of the contract verification on **2026-09-07**:
 - `reviews` and `reviewSummary` trigger **Text Search Enterprise + Atmosphere**;
 - the default `core` profile contains only IDs-only + Pro fields and therefore triggers **Text Search Pro**.
 
+The default is also **one page**, so an ordinary invocation makes at most one Text Search request unless the caller explicitly opts into `--max-pages 2` or `3`. The CLI reports that maximum request count alongside the SKU preflight.
+
 Authoritative references:
 
 - https://developers.google.com/maps/documentation/places/web-service/text-search
@@ -41,7 +43,6 @@ python -m pip install -r requirements.txt
 export GOOGLE_PLACES_API_KEY="YOUR_KEY"
 python -m gmaps_scraper.cli \
   --query "restaurants in Buenos Aires" \
-  --max-pages 1 \
   --format csv
 ```
 
@@ -66,8 +67,7 @@ Examples:
 # Cheapest discovery shape
 python -m gmaps_scraper.cli \
   --query "cafes in Almagro, Buenos Aires" \
-  --profile ids \
-  --max-pages 1
+  --profile ids
 
 # Default useful baseline: Pro
 python -m gmaps_scraper.cli \
@@ -93,8 +93,7 @@ python -m gmaps_scraper.cli \
 ```bash
 python -m gmaps_scraper.cli \
   --query "restaurants in Almagro, Buenos Aires" \
-  --fields "places.displayName,places.formattedAddress,places.location,places.googleMapsUri" \
-  --max-pages 1
+  --fields "places.displayName,places.formattedAddress,places.location,places.googleMapsUri"
 ```
 
 The tool normalizes and de-duplicates the mask and includes `nextPageToken` for pagination. Nested masks such as `places.displayName.text` are classified through their documented top-level billable field.
@@ -107,14 +106,14 @@ Wildcard masks (`*` / `places.*`) and fields that are not in the dated local cla
 --query / -q        One Text Search query (required)
 --profile           ids | core | enterprise | atmosphere
 --fields            Expert comma-separated field-mask override
---max-pages         1..3, default 3
+--max-pages         1..3, default 1
 --language-code     Optional Places language code
 --region-code       Optional Places region code
 --out-dir           Output directory, default ./out
 --format            csv | json | both, default csv
 ```
 
-Text Search (New) currently returns at most 60 results across all pages. This client therefore caps `--max-pages` at 3.
+Text Search (New) currently returns at most 60 results across all pages. This client caps `--max-pages` at 3, but makes one page the default so extra billable page requests are explicit.
 
 ## Output contract
 
@@ -131,7 +130,7 @@ The client:
 - posts to `https://places.googleapis.com/v1/places:searchText`;
 - requires an explicit response field mask;
 - follows `nextPageToken` using `pageToken`;
-- bounds requests to at most three pages;
+- defaults to one page and allows an explicit maximum of three;
 - retries only explicit retryable HTTP responses (`429`, `500`, `502`, `503`, `504`), with bounded backoff;
 - does **not** automatically retry ambiguous network exceptions, because the server may already have received a billable request.
 
