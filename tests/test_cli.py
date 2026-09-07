@@ -64,6 +64,54 @@ class CliContractTests(unittest.TestCase):
             self.assertEqual(rows[0]["name"], "Example Cafe")
             self.assertEqual(rows[0]["source_query"], "example cafe")
 
+    def test_geographic_circle_maps_to_google_location_bias(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            stderr = io.StringIO()
+            with patch("gmaps_scraper.providers.search_text", return_value=[]) as search:
+                with redirect_stderr(stderr), redirect_stdout(io.StringIO()):
+                    cli.main(
+                        [
+                            "--query",
+                            "cafes",
+                            "--center",
+                            "-34.60,-58.38",
+                            "--radius-m",
+                            "2500",
+                            "--out-dir",
+                            tmpdir,
+                        ]
+                    )
+
+            self.assertEqual(
+                search.call_args.kwargs["location_bias"],
+                {
+                    "circle": {
+                        "center": {"latitude": -34.6, "longitude": -58.38},
+                        "radius": 2500.0,
+                    }
+                },
+            )
+            self.assertIn("Geographic bias: circle(-34.6,-58.38, radius_m=2500)", stderr.getvalue())
+
+    def test_geographic_circle_requires_center_and_radius_together(self) -> None:
+        with self.assertRaisesRegex(SystemExit, "must be provided together"):
+            cli.main(["--query", "cafes", "--center", "-34.6,-58.4"])
+
+    def test_google_radius_is_bounded_before_network_access(self) -> None:
+        with patch("gmaps_scraper.providers.search_text") as search:
+            with self.assertRaisesRegex(SystemExit, "between 0 and 50000"):
+                cli.main(
+                    [
+                        "--query",
+                        "cafes",
+                        "--center",
+                        "-34.6,-58.4",
+                        "--radius-m",
+                        "50001",
+                    ]
+                )
+            search.assert_not_called()
+
     def test_provider_output_preserves_custom_field_schema(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             with patch("gmaps_scraper.providers.search_text", return_value=[SAMPLE_PLACE]) as search:
