@@ -32,6 +32,11 @@ def normalize_field_mask(field_mask: str) -> str:
     if not raw:
         raise ValueError("field_mask must contain at least one field")
 
+    # A top-level wildcard already covers nextPageToken and every Place field.
+    # Keep it alone rather than manufacturing a questionable `nextPageToken,*` mask.
+    if "*" in raw:
+        return "*"
+
     normalized: list[str] = []
     for field in raw:
         if field == "places.nextPageToken":
