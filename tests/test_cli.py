@@ -27,7 +27,7 @@ SAMPLE_PLACE = {
 
 
 class CliContractTests(unittest.TestCase):
-    def test_default_profile_is_core_pro_and_has_no_enterprise_fields(self) -> None:
+    def test_default_profile_is_core_pro_and_one_page(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             stderr = io.StringIO()
             stdout = io.StringIO()
@@ -37,20 +37,20 @@ class CliContractTests(unittest.TestCase):
                         [
                             "--query",
                             "example cafe",
-                            "--max-pages",
-                            "1",
                             "--out-dir",
                             tmpdir,
                         ]
                     )
 
             self.assertEqual(rc, 0)
+            self.assertEqual(search.call_args.kwargs["max_pages"], 1)
             field_mask = search.call_args.kwargs["field_mask"]
             self.assertIn("places.displayName", field_mask)
             self.assertNotIn("places.rating", field_mask)
             self.assertNotIn("places.websiteUri", field_mask)
             self.assertNotIn("places.reviews", field_mask)
             self.assertIn("Highest triggered SKU: Text Search Pro", stderr.getvalue())
+            self.assertIn("Maximum Text Search requests this run: 1", stderr.getvalue())
 
             csv_files = list(Path(tmpdir).glob("*.csv"))
             self.assertEqual(len(csv_files), 1)
