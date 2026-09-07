@@ -58,6 +58,7 @@ class CliContractTests(unittest.TestCase):
                 header = next(csv.reader(handle))
             self.assertIn("display_name", header)
             self.assertNotIn("rating", header)
+            self.assertNotIn("nextPageToken", header)
 
     def test_custom_fields_control_request_and_csv_schema(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -89,6 +90,7 @@ class CliContractTests(unittest.TestCase):
             self.assertIn("formatted_address", header)
             self.assertNotIn("rating", header)
             self.assertNotIn("website", header)
+            self.assertNotIn("nextPageToken", header)
 
     def test_profile_and_custom_fields_are_mutually_exclusive(self) -> None:
         with redirect_stderr(io.StringIO()):
