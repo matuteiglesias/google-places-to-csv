@@ -1,0 +1,41 @@
+name: Places cost / field classification issue
+description: Report a Google Text Search field/SKU mismatch, unknown field, or cost-contract regression.
+title: "cost-contract: "
+labels: []
+body:
+  - type: markdown
+    attributes:
+      value: |
+        The local field/SKU map is deliberately dated. This template helps turn provider changes into reproducible maintenance evidence.
+  - type: input
+    id: field
+    attributes:
+      label: Field or field mask
+      placeholder: places.websiteUri or places.displayName,places.futureField
+    validations:
+      required: true
+  - type: input
+    id: expected
+    attributes:
+      label: Expected Text Search SKU / behavior
+      placeholder: Text Search Enterprise
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Authoritative evidence
+      description: Link the current Google documentation or pricing/SKU source supporting the classification.
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Project version / commit
+      placeholder: 0.2.0 or commit SHA
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction
+      description: Include the places-costcheck command/output when possible.
+      render: shell

@@ -1,0 +1,49 @@
+name: Provider adapter / integration request
+description: Propose a concrete local-business provider or workflow integration backed by a real use case.
+title: "provider: "
+labels: []
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Provider adapters are added for real consumers, not to collect logos. Please anchor the request in an actual workflow.
+  - type: input
+    id: provider
+    attributes:
+      label: Provider / integration
+      placeholder: Openmart, Foursquare, Geoapify, n8n, Pipedream, MCP server...
+    validations:
+      required: true
+  - type: textarea
+    id: workflow
+    attributes:
+      label: Concrete workflow
+      description: What local-business discovery/enrichment job needs this adapter?
+    validations:
+      required: true
+  - type: textarea
+    id: identity
+    attributes:
+      label: Identity and handoff semantics
+      description: What is the durable provider ID? Can it map from/to Google Place ID or another known identifier?
+    validations:
+      required: true
+  - type: textarea
+    id: policy
+    attributes:
+      label: Data/persistence contract
+      description: Link authoritative provider terms/docs and describe what may be stored or redistributed.
+    validations:
+      required: true
+  - type: textarea
+    id: cost
+    attributes:
+      label: Cost / quota semantics
+      description: What request, result, credit, or field semantics materially affect cost?
+  - type: textarea
+    id: minimum
+    attributes:
+      label: Smallest useful implementation
+      description: Describe the minimum adapter surface that would unlock the workflow.
+    validations:
+      required: true
