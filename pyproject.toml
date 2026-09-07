@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "google-places-to-csv"
 version = "0.2.0.dev0"
-description = "Governed local-business discovery with cost-aware Google Places and provider-ready output contracts"
+description = "Governed local-business discovery and census with provider-aware persistence and cost boundaries"
 readme = "README.md"
 requires-python = ">=3.10"
 authors = [
@@ -27,6 +27,7 @@ Repository = "https://github.com/matuteiglesias/google-places-to-csv"
 [project.scripts]
 google-places-to-csv = "gmaps_scraper.cli:main"
 local-business-discover = "gmaps_scraper.cli:main"
+local-business-census = "gmaps_scraper.census:main"
 places-costcheck = "gmaps_scraper.costcheck:main"
 
 [tool.setuptools.packages.find]
