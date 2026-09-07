@@ -73,8 +73,10 @@ class CliContractTests(unittest.TestCase):
                         [
                             "--query",
                             "cafes",
-                            "--center",
-                            "-34.60,-58.38",
+                            "--latitude",
+                            "-34.60",
+                            "--longitude",
+                            "-58.38",
                             "--radius-m",
                             "2500",
                             "--out-dir",
@@ -93,9 +95,9 @@ class CliContractTests(unittest.TestCase):
             )
             self.assertIn("Geographic bias: circle(-34.6,-58.38, radius_m=2500)", stderr.getvalue())
 
-    def test_geographic_circle_requires_center_and_radius_together(self) -> None:
+    def test_geographic_circle_requires_all_three_values(self) -> None:
         with self.assertRaisesRegex(SystemExit, "must be provided together"):
-            cli.main(["--query", "cafes", "--center", "-34.6,-58.4"])
+            cli.main(["--query", "cafes", "--latitude", "-34.6"])
 
     def test_google_radius_is_bounded_before_network_access(self) -> None:
         with patch("gmaps_scraper.providers.search_text") as search:
@@ -104,8 +106,10 @@ class CliContractTests(unittest.TestCase):
                     [
                         "--query",
                         "cafes",
-                        "--center",
-                        "-34.6,-58.4",
+                        "--latitude",
+                        "-34.6",
+                        "--longitude",
+                        "-58.4",
                         "--radius-m",
                         "50001",
                     ]
