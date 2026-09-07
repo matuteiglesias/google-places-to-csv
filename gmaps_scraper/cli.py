@@ -10,7 +10,7 @@ from .billing import VERIFIED_ON, assess_text_search_fields
 from .kernel import utc_observed_at
 from .normalize import flatten_place
 from .profiles import DEFAULT_PROFILE, PROFILES, profile_fields
-from .providers import DiscoveryRequest, GeoCircle, ProviderSpec, get_provider, provider_names
+from .providers import DiscoveryRequest, GeoArea, GeoCircle, ProviderSpec, get_provider, provider_names
 from .utils import now_stamp, slugify, write_csv, write_json
 
 
@@ -20,49 +20,44 @@ OUTPUT_CONTRACTS = ("business", "refs", "provider")
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description=(
-            "Governed local-business discovery with Google Places Text Search today "
-            "and a provider-ready output contract."
+            "Governed local-business discovery across provider adapters, with explicit "
+            "persistence and cost boundaries."
         )
     )
     parser.add_argument(
         "--query",
         "-q",
         required=True,
-        help="Local-business discovery query (e.g. 'restaurants').",
+        help="Local-business discovery query (e.g. 'cosmetic dentist').",
     )
     parser.add_argument(
         "--provider",
         choices=provider_names(),
         default="google",
-        help="Discovery provider (currently: google).",
+        help="Discovery provider (google or openmart).",
     )
 
     selector = parser.add_mutually_exclusive_group()
     selector.add_argument(
         "--profile",
         choices=sorted(PROFILES),
-        help=f"Named Google field profile (default: {DEFAULT_PROFILE}).",
+        help=f"Named Google field profile (default for Google: {DEFAULT_PROFILE}).",
     )
     selector.add_argument(
         "--fields",
         help="Expert override: comma-separated Google Places response fields.",
     )
 
-    parser.add_argument(
-        "--latitude",
-        type=float,
-        help="Optional geographic bias center latitude.",
-    )
-    parser.add_argument(
-        "--longitude",
-        type=float,
-        help="Optional geographic bias center longitude.",
-    )
+    parser.add_argument("--latitude", type=float, help="Optional Google circle-bias latitude.")
+    parser.add_argument("--longitude", type=float, help="Optional Google circle-bias longitude.")
     parser.add_argument(
         "--radius-m",
         type=float,
-        help="Radius in meters for latitude/longitude. Google Text Search allows 0..50000.",
+        help="Google circle-bias radius in meters (0..50000).",
     )
+    parser.add_argument("--city", default=None, help="Structured provider area city (Openmart).")
+    parser.add_argument("--state", default=None, help="Structured provider area state/region (Openmart).")
+    parser.add_argument("--country", default=None, help="Structured provider area country code/name (Openmart).")
     parser.add_argument(
         "--output-contract",
         choices=OUTPUT_CONTRACTS,
@@ -76,16 +71,18 @@ def build_parser() -> argparse.ArgumentParser:
         "--max-pages",
         type=int,
         default=1,
-        help="Maximum Google Text Search pages, 1..3 (default: 1).",
+        help="Maximum provider pages, 1..3 (default: 1).",
+    )
+    parser.add_argument(
+        "--page-size",
+        type=int,
+        default=None,
+        help="Provider page size. Openmart supports 1..100; Google uses its API default.",
     )
     parser.add_argument("--language-code", default=None)
     parser.add_argument("--region-code", default=None)
     parser.add_argument("--out-dir", default="out")
-    parser.add_argument(
-        "--format",
-        choices=["csv", "json", "both"],
-        default="csv",
-    )
+    parser.add_argument("--format", choices=["csv", "json", "both"], default="csv")
     return parser
 
 
@@ -98,9 +95,9 @@ def resolve_circle(args: argparse.Namespace) -> GeoCircle | None:
     if all(value is None for value in geo_values):
         return None
     if any(value is None for value in geo_values):
-        raise SystemExit(
-            "--latitude, --longitude, and --radius-m must be provided together."
-        )
+        raise SystemExit("--latitude, --longitude, and --radius-m must be provided together.")
+    if args.provider != "google":
+        raise SystemExit("--latitude/--longitude/--radius-m are currently supported only by Google.")
 
     try:
         circle = GeoCircle(
@@ -111,12 +108,36 @@ def resolve_circle(args: argparse.Namespace) -> GeoCircle | None:
     except (ValueError, TypeError) as exc:
         raise SystemExit(f"Invalid geographic circle: {exc}") from exc
 
-    if args.provider == "google" and circle.radius_m > 50000:
+    if circle.radius_m > 50000:
         raise SystemExit("Google Text Search --radius-m must be between 0 and 50000.")
     return circle
 
 
+def resolve_area(args: argparse.Namespace, circle: GeoCircle | None) -> GeoArea | None:
+    values = (args.city, args.state, args.country)
+    if all(value in (None, "") for value in values):
+        return None
+    if circle is not None:
+        raise SystemExit("Structured --city/--state/--country cannot be combined with a circle.")
+    if args.provider != "openmart":
+        raise SystemExit("--city/--state/--country are currently supported only by Openmart.")
+    try:
+        return GeoArea(city=args.city, state=args.state, country=args.country)
+    except ValueError as exc:
+        raise SystemExit(f"Invalid structured area: {exc}") from exc
+
+
 def resolve_fields(args: argparse.Namespace) -> tuple[str, list[str]]:
+    if args.provider != "google":
+        if args.profile or args.fields:
+            raise SystemExit("--profile and --fields are Google-specific options.")
+        if args.output_contract == "provider":
+            raise SystemExit(
+                "--output-contract provider is a legacy Google-specific surface; "
+                "use business or refs with other providers."
+            )
+        return "provider-default", []
+
     if args.output_contract == "refs":
         if args.fields:
             raise SystemExit(
@@ -143,6 +164,7 @@ def describe_provider(
     spec: ProviderSpec,
     output_contract: str,
     circle: GeoCircle | None,
+    area: GeoArea | None,
 ) -> None:
     print(f"Provider: {spec.key} ({spec.label})", file=sys.stderr)
     print(f"Output contract: {output_contract}", file=sys.stderr)
@@ -152,12 +174,12 @@ def describe_provider(
             f"circle({circle.latitude},{circle.longitude}, radius_m={circle.radius_m:g})",
             file=sys.stderr,
         )
+    if area is not None:
+        bits = [part for part in (area.city, area.state, area.country) if part]
+        print("Structured area: " + ", ".join(bits), file=sys.stderr)
     print(f"Provider policy metadata verified: {spec.policy_verified_on}", file=sys.stderr)
     if output_contract == "refs":
-        print(
-            f"Persistence guidance: durable {spec.durable_identifier} handoff only.",
-            file=sys.stderr,
-        )
+        print(f"Persistence guidance: durable {spec.durable_identifier} handoff.", file=sys.stderr)
     else:
         print(
             f"Persistence guidance: {spec.persistence_mode}; see COMPLIANCE.md.",
@@ -185,10 +207,7 @@ def describe_billing(selection_name: str, fields: Iterable[str], max_pages: int)
             file=sys.stderr,
         )
     if assessment.unknown_fields:
-        print(
-            "  Unclassified fields: " + ", ".join(assessment.unknown_fields),
-            file=sys.stderr,
-        )
+        print("  Unclassified fields: " + ", ".join(assessment.unknown_fields), file=sys.stderr)
     print(
         "  Verify the current Google Places Text Search field/SKU documentation before running.",
         file=sys.stderr,
@@ -241,23 +260,38 @@ def _materialize_output(
 def main(argv: Sequence[str] | None = None) -> int:
     args = parse_args(argv)
     if args.max_pages < 1 or args.max_pages > 3:
-        raise SystemExit("--max-pages must be between 1 and 3 for Google Text Search.")
+        raise SystemExit("--max-pages must be between 1 and 3.")
+    if args.provider == "google" and args.page_size is not None:
+        raise SystemExit("--page-size is currently supported only by Openmart.")
+    if args.provider == "openmart" and args.page_size is not None and not 1 <= args.page_size <= 100:
+        raise SystemExit("Openmart --page-size must be between 1 and 100.")
+    if args.provider != "google" and (args.language_code or args.region_code):
+        raise SystemExit("--language-code and --region-code are currently Google-specific.")
 
     circle = resolve_circle(args)
+    area = resolve_area(args, circle)
     provider = get_provider(args.provider)
     selection_name, fields = resolve_fields(args)
-    describe_provider(provider.spec, args.output_contract, circle)
-    describe_billing(selection_name, fields, args.max_pages)
-    field_mask = ",".join(fields)
+    describe_provider(provider.spec, args.output_contract, circle, area)
+    if provider.spec.key == "google":
+        describe_billing(selection_name, fields, args.max_pages)
+    else:
+        print(
+            f"Maximum provider records requested: {(args.page_size or 50) * args.max_pages}",
+            file=sys.stderr,
+        )
+    field_mask = ",".join(fields) if fields else None
 
     raw_results = provider.search(
         DiscoveryRequest(
             query=args.query,
             field_mask=field_mask,
             max_pages=args.max_pages,
+            page_size=args.page_size,
             language_code=args.language_code,
             region_code=args.region_code,
             circle=circle,
+            area=area,
         )
     )
     raw_results = _dedupe_provider_results(provider, raw_results)

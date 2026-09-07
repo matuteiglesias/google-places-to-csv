@@ -3,7 +3,7 @@ from __future__ import annotations
 import unittest
 
 from gmaps_scraper.kernel import google_place_to_business_record, google_place_to_ref
-from gmaps_scraper.providers import GOOGLE_SPEC, get_provider, provider_names
+from gmaps_scraper.providers import GOOGLE_SPEC, OPENMART_SPEC, get_provider, provider_names
 
 
 PLACE = {
@@ -24,13 +24,19 @@ PLACE = {
 
 
 class KernelContractTests(unittest.TestCase):
-    def test_google_provider_is_registered_with_explicit_policy(self) -> None:
-        self.assertEqual(provider_names(), ("google",))
-        provider = get_provider("google")
-        self.assertEqual(provider.spec, GOOGLE_SPEC)
-        self.assertEqual(provider.spec.persistence_mode, "provider-terms-controlled")
-        self.assertIn("durable-id-handoff", provider.spec.capabilities)
-        self.assertTrue(provider.spec.terms_url.startswith("https://developers.google.com/"))
+    def test_provider_registry_has_explicit_policy_metadata(self) -> None:
+        self.assertEqual(provider_names(), ("google", "openmart"))
+        google = get_provider("google")
+        openmart = get_provider("openmart")
+        self.assertEqual(google.spec, GOOGLE_SPEC)
+        self.assertEqual(openmart.spec, OPENMART_SPEC)
+        self.assertEqual(google.spec.persistence_mode, "provider-terms-controlled")
+        self.assertIn("durable-id-handoff", google.spec.capabilities)
+        self.assertEqual(openmart.spec.persistence_mode, "provider-documented-lead-generation")
+        self.assertIn("lead-generation", openmart.spec.capabilities)
+        self.assertIn("cursor-pagination", openmart.spec.capabilities)
+        self.assertTrue(google.spec.terms_url.startswith("https://cloud.google.com/"))
+        self.assertTrue(openmart.spec.docs_url.startswith("https://app.openmart.com/api-docs/"))
 
     def test_business_ref_contains_only_provider_identity_and_client_provenance(self) -> None:
         ref = google_place_to_ref(
