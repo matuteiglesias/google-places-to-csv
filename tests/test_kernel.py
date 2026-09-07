@@ -34,8 +34,9 @@ class KernelContractTests(unittest.TestCase):
         self.assertIn("durable-id-handoff", google.spec.capabilities)
         self.assertEqual(openmart.spec.persistence_mode, "provider-documented-lead-generation")
         self.assertIn("lead-generation", openmart.spec.capabilities)
+        self.assertIn("cursor-pagination", openmart.spec.capabilities)
         self.assertTrue(google.spec.terms_url.startswith("https://cloud.google.com/"))
-        self.assertTrue(openmart.spec.docs_url.startswith("https://www.openmart.com/"))
+        self.assertTrue(openmart.spec.docs_url.startswith("https://app.openmart.com/api-docs/"))
 
     def test_business_ref_contains_only_provider_identity_and_client_provenance(self) -> None:
         ref = google_place_to_ref(
