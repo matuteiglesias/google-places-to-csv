@@ -1,26 +1,31 @@
 # Local-business provider contract
 
-The repository is evolving from a Google-specific CSV utility into a small provider-aware local-business discovery kernel. The objective is **not** to implement every Places/data API. The objective is to make adding the next provider surgical when a real workflow requires it.
+The repository is a small provider-aware local-business discovery and census kernel. The objective is **not** to implement every Places/data API. The objective is to keep provider semantics explicit and make the next adapter surgical only when a real workflow requires it.
 
 ## Stable concepts
 
 ### Discovery request
 
-`DiscoveryRequest` captures the provider request inputs the kernel currently needs:
+`DiscoveryRequest` captures only shared inputs already required by implemented providers:
 
 - text query;
 - provider field mask/profile when applicable;
 - bounded page/request count;
-- language and region hints;
-- optional provider-neutral circular geography bias (`GeoCircle`).
+- optional page size when the provider exposes it;
+- language and region hints when supported;
+- optional circular geography (`GeoCircle`);
+- optional structured geography (`GeoArea`: city/state/country).
 
-The circular bias is deliberately shared because it maps naturally to current Google Text Search, Foursquare Place Search, and Geoapify spatial search semantics. Exact inclusion/restriction semantics remain provider-specific; the current Google adapter maps it to `locationBias`, which is a bias rather than a hard boundary.
+Geography semantics remain provider-specific rather than being falsely unified:
 
-A future provider may expose additional provider-specific options, but the shared kernel should only grow when at least two real providers need the same concept.
+- Google currently maps `GeoCircle` to Text Search `locationBias`; it is a bias, not a hard inclusion boundary.
+- Openmart currently maps `GeoArea` to its structured city/state/country search payload.
+
+A future shared concept should enter `DiscoveryRequest` only when concrete implemented workflows justify it. Provider-only knobs can remain adapter-specific until then.
 
 ### BusinessRef
 
-`BusinessRef` is the durable identity/handoff contract:
+`BusinessRef` is the minimal durable identity/handoff contract:
 
 ```json
 {
@@ -31,9 +36,7 @@ A future provider may expose additional provider-specific options, but the share
 }
 ```
 
-It deliberately excludes business names, addresses, ratings, phone numbers, reviews, and other provider content. For Google, `provider_id` is the Google Place ID, which Google explicitly allows to be stored.
-
-This is the preferred seam for persistent enrichment workflows.
+It deliberately excludes business names, addresses, ratings, phone numbers, reviews, and other provider content. Whether a provider ID may be persisted is still governed by that provider's current terms/policy metadata.
 
 ### BusinessRecord
 
@@ -47,9 +50,9 @@ This is the preferred seam for persistent enrichment workflows.
 - provider URL;
 - source-query provenance.
 
-The schema is intentionally modest. Do not turn it into a universal CRM model. Provider-specific fields can stay in provider-native payloads until repeated downstream demand justifies a shared field.
+The schema is intentionally modest. Do not turn it into a universal CRM model. Missing fields remain empty; provider-specific fields stay provider-specific until repeated downstream demand justifies a shared field.
 
-`BusinessRecord` does **not** imply that its contents may be persisted. Persistence is governed by `ProviderSpec` and the provider's actual terms.
+`BusinessRecord` does **not** itself grant persistence rights. Persistence is governed by `ProviderSpec` and the provider/account's actual terms. The current Openmart adapter is specifically present because Matías's bounded lead-census workflow requires a provider whose documented product surface supports persistent B2B lead data.
 
 ## Provider adapter requirements
 
@@ -59,52 +62,57 @@ An adapter implements three operations:
 2. `to_ref(raw) -> BusinessRef | None`
 3. `to_record(raw) -> BusinessRecord`
 
-It also declares a `ProviderSpec` with explicit capabilities and policy metadata.
+It also declares a `ProviderSpec` with explicit capabilities and dated policy metadata.
 
-The existing Google adapter is deliberately thin and delegates transport to the already-tested Text Search client.
+Implemented adapters are deliberately thin:
+
+- **Google Places Text Search** delegates transport to the existing cost-aware Text Search client.
+- **Openmart Local Business API** delegates transport/pagination/normalization to `gmaps_scraper.openmart` and supports the current structured-area lead-census use case.
 
 ## Output contracts
-
-The CLI exposes three contracts:
 
 ### `business` (default)
 
 Provider-neutral records for programmatic processing and integrations.
 
-This gives workflow tools (Pipedream, n8n, Make, MCP servers, internal lead workflows) a stable shape without coupling them to the Google response schema.
+For Openmart this is also the normal census artifact because its current public product documentation explicitly supports B2B lead-generation/storage; users must still verify their actual account terms before production use.
 
 ### `refs`
 
-Durable provider IDs plus client-generated provenance only.
+Minimal provider IDs plus client-generated provenance.
 
-For Google this automatically uses the IDs-only field profile, so it simultaneously minimizes the requested content and the current Text Search SKU. This is the preferred handoff to a provider that supports persistent enrichment by Google Place ID.
+For Google this automatically uses the IDs-only field profile, minimizing requested Google Places content and the current Text Search SKU. For other providers it remains a provider-identity handoff, subject to that provider's identifier policy.
 
 ### `provider`
 
 Legacy Google-shaped output for compatibility and diagnostics. It is intentionally not the extension contract for new providers.
 
-## Candidate provider seams
+## Implemented provider seams
 
-These are **candidates**, not implemented adapters.
-
-| Provider | Current relevant seam | Why it matters |
+| Provider | Implemented seam | Current intended use |
 | --- | --- | --- |
-| Google Places | Text Search + circle bias + durable Place ID | high-quality discovery, explicit field/SKU governance |
-| Openmart | search + enrichment, including lookup by Google Place ID | persistent local-business/lead enrichment path |
-| Foursquare Places | place search by query/location/category | independent place identity and discovery backend |
+| Google Places | Text Search + circle bias + field/SKU preflight + Place ID | bounded discovery/integration under Google's service contract; durable ID handoff where allowed |
+| Openmart | local-business search + structured city/state/country area + normalized record | persistent bounded B2B lead census under Openmart's documented product/account terms |
+
+References verified during the 2026-09-07 pass:
+
+- Google Text Search: https://developers.google.com/maps/documentation/places/web-service/text-search
+- Google Maps service-specific terms: https://cloud.google.com/maps-platform/terms/maps-service-terms
+- Openmart API tutorial: https://www.openmart.com/product-tutorials/using-the-openmart-api-to-fetch-data
+- Openmart Local Business Data API: https://www.openmart.com/products/local-business-data-api
+
+## Candidate future seams
+
+These are **not implemented** and should remain that way until a real consumer requires them:
+
+| Provider | Potential seam | Why it might matter |
+| --- | --- | --- |
+| Foursquare Places | place search by query/location/category | independent place identity/discovery backend |
 | Geoapify Places | category + spatial Places API | category/geography-first POI discovery backend |
-
-References verified during the 2026-09-07 design pass:
-
-- Google Text Search geography: https://developers.google.com/maps/documentation/places/web-service/text-search
-- Google Place IDs: https://developers.google.com/maps/documentation/places/web-service/place-id
-- Openmart local-business API: https://www.openmart.com/products/local-business-data-api
-- Foursquare Place Search: https://docs.foursquare.com/fsq-developers-places/reference/place-search
-- Geoapify Places API: https://apidocs.geoapify.com/docs/places/
 
 ## Integration examples
 
-### Geography-biased Google discovery -> durable refs
+### Geography-biased Google discovery -> minimal refs
 
 ```bash
 local-business-discover \
@@ -116,38 +124,59 @@ local-business-discover \
   --format json
 ```
 
-For Google, the circle is a search bias, not a hard inclusion boundary. The output can be queued, deduplicated, or handed to a downstream provider keyed by Google Place ID without persisting the richer Google response.
-
-### Transient normalized business records
+### Persistent Openmart business discovery
 
 ```bash
 local-business-discover \
-  --query "cafes" \
-  --latitude -34.6037 \
-  --longitude -58.3816 \
-  --radius-m 5000 \
-  --profile core \
+  --provider openmart \
+  --query "cosmetic dentist" \
+  --city Greenwich \
+  --state CT \
+  --country US \
+  --page-size 50 \
   --output-contract business \
-  --format json
+  --format both
 ```
 
-This is the intended surface for workflow integrations that need a stable provider-neutral shape.
+### Bounded multi-cell census
 
-### Cost preflight without a provider call
+```bash
+local-business-census \
+  examples/census/website-leads-us-affluent.json \
+  --dry-run
+```
+
+The included plan is bounded to 16 cells and at most 16 provider requests / 800 raw observations before deduplication. See `docs/CENSUS.md`.
+
+### Google cost preflight without a provider call
 
 ```bash
 places-costcheck \
   --fields "places.displayName,places.formattedAddress,places.websiteUri"
 ```
 
-This surface exists independently from discovery so other repositories/integrations can use the cost contract without adopting the full client.
+This surface remains independent from discovery so other repositories/integrations can use the Google cost contract without adopting the full client.
+
+## Census contract
+
+A census is a finite set of explicit `query × geography` cells. The runner must:
+
+- preflight and hard-cap total provider requests before network access;
+- preserve provider identity for deterministic cross-cell deduplication;
+- preserve cell membership/provenance rather than collapsing how a business was found;
+- emit a run manifest with the plan hash, provider/policy metadata, budgets and counts;
+- perform no arbitrary web crawling, opportunity inference, people lookup, outreach, or CRM synchronization.
+
+This is the intended boundary for Matías's current lead-list use case.
 
 ## Non-goals for the kernel
 
 - universal CRM schema;
-- automatic owner/email enrichment without a named provider and consumer;
+- website-quality or market-intelligence inference;
+- automatic owner/email enrichment or paid contact unlocking;
 - silent cross-provider identity merging;
-- scraping web pages;
+- arbitrary web scraping;
 - assuming one provider's legal/storage contract applies to another;
-- account-specific billing estimation;
+- account-specific dollar billing estimation;
+- outreach automation;
 - implementing adapters merely to populate a logo list.
