@@ -109,7 +109,8 @@ References verified during the 2026-09-07 design pass:
 ```bash
 local-business-discover \
   --query "roofers" \
-  --center "32.7767,-96.7970" \
+  --latitude 32.7767 \
+  --longitude -96.7970 \
   --radius-m 10000 \
   --output-contract refs \
   --format json
@@ -122,7 +123,8 @@ For Google, the circle is a search bias, not a hard inclusion boundary. The outp
 ```bash
 local-business-discover \
   --query "cafes" \
-  --center "-34.6037,-58.3816" \
+  --latitude -34.6037 \
+  --longitude -58.3816 \
   --radius-m 5000 \
   --profile core \
   --output-contract business \
