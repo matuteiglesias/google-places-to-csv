@@ -37,8 +37,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--max-pages",
         type=int,
-        default=3,
-        help="Maximum Text Search pages, 1..3 (default: 3).",
+        default=1,
+        help="Maximum Text Search pages, 1..3 (default: 1).",
     )
     parser.add_argument("--language-code", default=None)
     parser.add_argument("--region-code", default=None)
@@ -68,12 +68,13 @@ def resolve_fields(args: argparse.Namespace) -> tuple[str, list[str]]:
     return selection_name, fields
 
 
-def describe_billing(selection_name: str, fields: Iterable[str]) -> None:
+def describe_billing(selection_name: str, fields: Iterable[str], max_pages: int) -> None:
     fields = list(fields)
     assessment = assess_text_search_fields(fields)
 
     print(f"Field selection: {selection_name}", file=sys.stderr)
     print(f"Field count: {len(fields)}", file=sys.stderr)
+    print(f"Maximum Text Search requests this run: {max_pages}", file=sys.stderr)
     print(f"Text Search billing map verified: {VERIFIED_ON}", file=sys.stderr)
 
     if assessment.fully_classified:
@@ -118,7 +119,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         raise SystemExit("--max-pages must be between 1 and 3 for Text Search.")
 
     selection_name, fields = resolve_fields(args)
-    describe_billing(selection_name, fields)
+    describe_billing(selection_name, fields, args.max_pages)
     field_mask = ",".join(fields)
 
     places = search_text(
