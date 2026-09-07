@@ -11,7 +11,10 @@ The repository is evolving from a Google-specific CSV utility into a small provi
 - text query;
 - provider field mask/profile when applicable;
 - bounded page/request count;
-- language and region hints.
+- language and region hints;
+- optional provider-neutral circular geography bias (`GeoCircle`).
+
+The circular bias is deliberately shared because it maps naturally to current Google Text Search, Foursquare Place Search, and Geoapify spatial search semantics. Exact inclusion/restriction semantics remain provider-specific; the current Google adapter maps it to `locationBias`, which is a bias rather than a hard boundary.
 
 A future provider may expose additional provider-specific options, but the shared kernel should only grow when at least two real providers need the same concept.
 
@@ -86,13 +89,14 @@ These are **candidates**, not implemented adapters.
 
 | Provider | Current relevant seam | Why it matters |
 | --- | --- | --- |
-| Google Places | Text Search + durable Place ID | high-quality discovery, explicit field/SKU governance |
+| Google Places | Text Search + circle bias + durable Place ID | high-quality discovery, explicit field/SKU governance |
 | Openmart | search + enrichment, including lookup by Google Place ID | persistent local-business/lead enrichment path |
 | Foursquare Places | place search by query/location/category | independent place identity and discovery backend |
 | Geoapify Places | category + spatial Places API | category/geography-first POI discovery backend |
 
 References verified during the 2026-09-07 design pass:
 
+- Google Text Search geography: https://developers.google.com/maps/documentation/places/web-service/text-search
 - Google Place IDs: https://developers.google.com/maps/documentation/places/web-service/place-id
 - Openmart local-business API: https://www.openmart.com/products/local-business-data-api
 - Foursquare Place Search: https://docs.foursquare.com/fsq-developers-places/reference/place-search
@@ -100,22 +104,26 @@ References verified during the 2026-09-07 design pass:
 
 ## Integration examples
 
-### Google discovery -> durable refs
+### Geography-biased Google discovery -> durable refs
 
 ```bash
 local-business-discover \
-  --query "roofers in Dallas" \
+  --query "roofers" \
+  --center "32.7767,-96.7970" \
+  --radius-m 10000 \
   --output-contract refs \
   --format json
 ```
 
-The output can be queued, deduplicated, or handed to a downstream provider keyed by Google Place ID without persisting the richer Google response.
+For Google, the circle is a search bias, not a hard inclusion boundary. The output can be queued, deduplicated, or handed to a downstream provider keyed by Google Place ID without persisting the richer Google response.
 
 ### Transient normalized business records
 
 ```bash
 local-business-discover \
-  --query "cafes in Buenos Aires" \
+  --query "cafes" \
+  --center "-34.6037,-58.3816" \
+  --radius-m 5000 \
   --profile core \
   --output-contract business \
   --format json
