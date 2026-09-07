@@ -25,6 +25,20 @@ SAMPLE_PLACE = {
     "rating": 4.8,
 }
 
+OPENMART_BUSINESS = {
+    "id": "loc_123",
+    "company_name": "Example Dental",
+    "company_type": "dentist",
+    "street_address": "1 Main St",
+    "city": "Greenwich",
+    "state": "CT",
+    "zipcode": "06830",
+    "website_url": "https://example.test",
+    "company_phones": ["+1-203-555-0100"],
+    "google_rating": 4.8,
+    "google_reviews_count": 120,
+}
+
 
 class CliContractTests(unittest.TestCase):
     def test_default_is_google_core_business_one_page(self) -> None:
@@ -169,7 +183,7 @@ class CliContractTests(unittest.TestCase):
                 "nextPageToken,places.id,places.name",
             )
             self.assertIn("Essentials (IDs Only)", stderr.getvalue())
-            self.assertIn("durable place_id handoff only", stderr.getvalue())
+            self.assertIn("durable place_id handoff", stderr.getvalue())
 
             csv_path = next(Path(tmpdir).glob("*.csv"))
             with csv_path.open(newline="", encoding="utf-8") as handle:
@@ -214,6 +228,60 @@ class CliContractTests(unittest.TestCase):
             with self.assertRaisesRegex(SystemExit, "between 1 and 3"):
                 cli.main(["--query", "x", "--max-pages", "4"])
             search.assert_not_called()
+
+    def test_openmart_uses_structured_area_without_google_field_selection(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            stderr = io.StringIO()
+            with patch("gmaps_scraper.providers.openmart_search_businesses", return_value=[OPENMART_BUSINESS]) as search:
+                with redirect_stderr(stderr), redirect_stdout(io.StringIO()):
+                    rc = cli.main(
+                        [
+                            "--query",
+                            "cosmetic dentist",
+                            "--provider",
+                            "openmart",
+                            "--city",
+                            "Greenwich",
+                            "--state",
+                            "CT",
+                            "--country",
+                            "US",
+                            "--page-size",
+                            "50",
+                            "--out-dir",
+                            tmpdir,
+                        ]
+                    )
+
+            self.assertEqual(rc, 0)
+            self.assertEqual(search.call_args.kwargs["query"], "cosmetic dentist")
+            self.assertEqual(search.call_args.kwargs["city"], "Greenwich")
+            self.assertEqual(search.call_args.kwargs["state"], "CT")
+            self.assertEqual(search.call_args.kwargs["country"], "US")
+            self.assertEqual(search.call_args.kwargs["page_size"], 50)
+            self.assertIn("Provider: openmart", stderr.getvalue())
+            self.assertIn("Structured area: Greenwich, CT, US", stderr.getvalue())
+            self.assertNotIn("Highest triggered SKU", stderr.getvalue())
+
+            csv_path = next(Path(tmpdir).glob("*.csv"))
+            with csv_path.open(newline="", encoding="utf-8") as handle:
+                rows = list(csv.DictReader(handle))
+            self.assertEqual(rows[0]["provider"], "openmart")
+            self.assertEqual(rows[0]["provider_id"], "loc_123")
+            self.assertEqual(rows[0]["website"], "https://example.test")
+
+    def test_openmart_rejects_google_specific_fields(self) -> None:
+        with self.assertRaisesRegex(SystemExit, "Google-specific"):
+            cli.main(
+                [
+                    "--query",
+                    "dentist",
+                    "--provider",
+                    "openmart",
+                    "--profile",
+                    "core",
+                ]
+            )
 
     def test_core_profile_constant_contains_no_review_fields(self) -> None:
         self.assertNotIn("places.reviews", CORE_FIELDS)
