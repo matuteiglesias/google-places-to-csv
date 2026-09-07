@@ -24,6 +24,7 @@ It intentionally remains a bounded API client/kernel rather than becoming a CRM,
 
 - **Cost-aware Google Places field masks**: named `ids`, `core`, `enterprise`, and `atmosphere` profiles with dated field -> SKU classification.
 - **One-request safe default**: ordinary Google discovery uses the `core` (Text Search Pro) profile and one page unless explicitly expanded.
+- **Geography-aware discovery**: a provider-neutral circular search bias maps to Google `locationBias` today and is reusable by future place providers.
 - **Standalone cost preflight**: `places-costcheck` classifies a field mask without credentials or network access.
 - **Provider-neutral business contract**: integrations can consume `BusinessRecord` instead of the Google response schema.
 - **Durable ID handoff**: `refs` emits only provider identity + client provenance; for Google this means Place IDs and automatically uses the IDs-only profile.
@@ -63,18 +64,20 @@ For a pipeline that needs persistent identity rather than Google Places content:
 export GOOGLE_PLACES_API_KEY="YOUR_KEY"
 
 local-business-discover \
-  --query "roofers in Dallas" \
+  --query "roofers" \
+  --center "32.7767,-96.7970" \
+  --radius-m 10000 \
   --output-contract refs \
   --format json
 ```
 
-`refs` deliberately requests the Google IDs-only profile and produces records shaped like:
+For Google, the circle is a **bias**, not a hard geographic inclusion boundary. `refs` deliberately requests the Google IDs-only profile and produces records shaped like:
 
 ```json
 {
   "provider": "google",
   "provider_id": "ChIJ...",
-  "source_query": "roofers in Dallas",
+  "source_query": "roofers",
   "observed_at": "2026-09-07T19:00:00+00:00"
 }
 ```
@@ -87,7 +90,9 @@ Default usage returns a common `BusinessRecord` shape:
 
 ```bash
 local-business-discover \
-  --query "cafes in Buenos Aires" \
+  --query "cafes" \
+  --center "-34.6037,-58.3816" \
+  --radius-m 5000 \
   --profile core \
   --output-contract business \
   --format both
@@ -164,10 +169,11 @@ Authoritative references:
 
 Google is the only implemented discovery provider in this version. The extension boundary is already explicit:
 
-1. `search(DiscoveryRequest)`
-2. `to_ref(raw) -> BusinessRef`
-3. `to_record(raw) -> BusinessRecord`
-4. `ProviderSpec` with docs, terms/policy metadata, durable identifier, and capabilities
+1. `DiscoveryRequest` with query, bounded requests, language/region, and optional `GeoCircle`;
+2. `search(DiscoveryRequest)`;
+3. `to_ref(raw) -> BusinessRef`;
+4. `to_record(raw) -> BusinessRecord`;
+5. `ProviderSpec` with docs, terms/policy metadata, durable identifier, and capabilities.
 
 See [`docs/PROVIDER_CONTRACT.md`](docs/PROVIDER_CONTRACT.md).
 
@@ -186,6 +192,8 @@ No adapter should be implemented until a real workflow/user makes its semantics 
 --provider          google (current implementation)
 --profile           ids | core | enterprise | atmosphere
 --fields            Expert Google field-mask override
+--center            Optional LAT,LNG search-bias center
+--radius-m          Radius paired with --center; Google supports 0..50000
 --output-contract   business | refs | provider
 --max-pages         1..3, default 1
 --language-code     Optional Google language code
@@ -202,6 +210,7 @@ For Google Text Search, the client:
 
 - posts to `https://places.googleapis.com/v1/places:searchText`;
 - requires/normalizes an explicit field mask;
+- can map a provider-neutral circular geography to Google `locationBias`;
 - follows `nextPageToken` using `pageToken`;
 - defaults to one page and caps explicit pagination at three pages;
 - retries only explicit retryable HTTP responses (`429`, `500`, `502`, `503`, `504`) with bounded backoff;
