@@ -30,6 +30,9 @@ class ApiContractTests(unittest.TestCase):
             "places.id,places.displayName,nextPageToken",
         )
 
+    def test_top_level_wildcard_stays_alone(self) -> None:
+        self.assertEqual(api.normalize_field_mask("places.id,*"), "*")
+
     def test_normalize_field_mask_rejects_empty(self) -> None:
         with self.assertRaises(ValueError):
             api.normalize_field_mask(" , ")
