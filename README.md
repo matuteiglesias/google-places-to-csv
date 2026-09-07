@@ -3,6 +3,9 @@
 Minimal CLI to turn **Google Places API v1 Text Search** results into clean **CSV/JSON files**.
 Supports field masks, pagination via `nextPageToken`, multi-query runs, and standardized filenames.
 
+> [!WARNING]
+> **Maintenance/cost notice (verified 2026-09-07):** the repository's current default masks are not a cheap baseline. The package CLI requests fields that trigger **Text Search Enterprise**; the legacy root `text_runner.py` additionally requests `reviews` / `reviewSummary`, which trigger **Enterprise + Atmosphere**. Before a paid run, use an explicit field mask and verify the applicable SKU. A consolidation and pricing-aware hardening plan is recorded in [`docs/API_CONTRACT_AUDIT_2026-09-07.md`](docs/API_CONTRACT_AUDIT_2026-09-07.md).
+
 * Input: one or more text queries (e.g., `restaurants in Buenos Aires`, `dentist palermo`, `barber 11211`)
 * Output: `./data/places_text_<slug(query)>_<YYYYMMDD_HHMMSS>.csv|json`
 * Auth: API key via `GOOGLE_PLACES_API_KEY` env var
