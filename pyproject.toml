@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "google-places-to-csv"
-version = "0.2.0"
+version = "0.2.0.dev0"
 description = "Governed local-business discovery with cost-aware Google Places and provider-ready output contracts"
 readme = "README.md"
 requires-python = ">=3.10"
