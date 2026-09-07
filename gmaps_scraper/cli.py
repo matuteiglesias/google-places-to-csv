@@ -10,7 +10,7 @@ from .billing import VERIFIED_ON, assess_text_search_fields
 from .kernel import utc_observed_at
 from .normalize import flatten_place
 from .profiles import DEFAULT_PROFILE, PROFILES, profile_fields
-from .providers import DiscoveryRequest, ProviderSpec, get_provider, provider_names
+from .providers import DiscoveryRequest, GeoCircle, ProviderSpec, get_provider, provider_names
 from .utils import now_stamp, slugify, write_csv, write_json
 
 
@@ -28,7 +28,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--query",
         "-q",
         required=True,
-        help="Local-business discovery query (e.g. 'restaurants in Buenos Aires').",
+        help="Local-business discovery query (e.g. 'restaurants').",
     )
     parser.add_argument(
         "--provider",
@@ -48,6 +48,15 @@ def build_parser() -> argparse.ArgumentParser:
         help="Expert override: comma-separated Google Places response fields.",
     )
 
+    parser.add_argument(
+        "--center",
+        help="Optional geographic bias center as LAT,LNG (for example -34.60,-58.38).",
+    )
+    parser.add_argument(
+        "--radius-m",
+        type=float,
+        help="Radius in meters for --center. Google Text Search locationBias allows 0..50000.",
+    )
     parser.add_argument(
         "--output-contract",
         choices=OUTPUT_CONTRACTS,
@@ -78,6 +87,27 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     return build_parser().parse_args(argv)
 
 
+def resolve_circle(args: argparse.Namespace) -> GeoCircle | None:
+    if args.center is None and args.radius_m is None:
+        return None
+    if args.center is None or args.radius_m is None:
+        raise SystemExit("--center and --radius-m must be provided together.")
+
+    try:
+        raw_lat, raw_lng = [part.strip() for part in args.center.split(",", 1)]
+        circle = GeoCircle(
+            latitude=float(raw_lat),
+            longitude=float(raw_lng),
+            radius_m=float(args.radius_m),
+        )
+    except (ValueError, TypeError) as exc:
+        raise SystemExit(f"Invalid geographic circle: {exc}") from exc
+
+    if args.provider == "google" and circle.radius_m > 50000:
+        raise SystemExit("Google Text Search --radius-m must be between 0 and 50000.")
+    return circle
+
+
 def resolve_fields(args: argparse.Namespace) -> tuple[str, list[str]]:
     if args.output_contract == "refs":
         if args.fields:
@@ -101,9 +131,19 @@ def resolve_fields(args: argparse.Namespace) -> tuple[str, list[str]]:
     return selection_name, fields
 
 
-def describe_provider(spec: ProviderSpec, output_contract: str) -> None:
+def describe_provider(
+    spec: ProviderSpec,
+    output_contract: str,
+    circle: GeoCircle | None,
+) -> None:
     print(f"Provider: {spec.key} ({spec.label})", file=sys.stderr)
     print(f"Output contract: {output_contract}", file=sys.stderr)
+    if circle is not None:
+        print(
+            "Geographic bias: "
+            f"circle({circle.latitude},{circle.longitude}, radius_m={circle.radius_m:g})",
+            file=sys.stderr,
+        )
     print(f"Provider policy metadata verified: {spec.policy_verified_on}", file=sys.stderr)
     if output_contract == "refs":
         print(
@@ -195,9 +235,10 @@ def main(argv: Sequence[str] | None = None) -> int:
     if args.max_pages < 1 or args.max_pages > 3:
         raise SystemExit("--max-pages must be between 1 and 3 for Google Text Search.")
 
+    circle = resolve_circle(args)
     provider = get_provider(args.provider)
     selection_name, fields = resolve_fields(args)
-    describe_provider(provider.spec, args.output_contract)
+    describe_provider(provider.spec, args.output_contract, circle)
     describe_billing(selection_name, fields, args.max_pages)
     field_mask = ",".join(fields)
 
@@ -208,6 +249,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             max_pages=args.max_pages,
             language_code=args.language_code,
             region_code=args.region_code,
+            circle=circle,
         )
     )
     raw_results = _dedupe_provider_results(provider, raw_results)
