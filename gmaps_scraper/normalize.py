@@ -51,6 +51,7 @@ def _expand_address_components(ac_list: List[Dict[str, Any]]) -> Dict[str, Any]:
                 out.setdefault("addr_country_code", short_text)
     return out
 
+
 def _expand_hours(prefix: str, hours: Dict[str, Any]) -> Dict[str, Any]:
     out: Dict[str, Any] = {}
     if not isinstance(hours, dict):
@@ -67,6 +68,7 @@ def _expand_hours(prefix: str, hours: Dict[str, Any]) -> Dict[str, Any]:
         out[f"{prefix}_periods_json"] = _as_json(hours.get("periods"))
     return out
 
+
 def _expand_price_range(pr: Dict[str, Any]) -> Dict[str, Any]:
     out: Dict[str, Any] = {}
     if not isinstance(pr, dict):
@@ -76,62 +78,86 @@ def _expand_price_range(pr: Dict[str, Any]) -> Dict[str, Any]:
     out["price_start_currency"] = start.get("currencyCode")
     return out
 
+
 def _expand_viewport(vp: Dict[str, Any]) -> Dict[str, Any]:
     out: Dict[str, Any] = {}
     if not isinstance(vp, dict):
         return out
     low = vp.get("low") or {}
     high = vp.get("high") or {}
-    out["viewport_low_lat"]  = low.get("latitude")
-    out["viewport_low_lng"]  = low.get("longitude")
+    out["viewport_low_lat"] = low.get("latitude")
+    out["viewport_low_lng"] = low.get("longitude")
     out["viewport_high_lat"] = high.get("latitude")
     out["viewport_high_lng"] = high.get("longitude")
     return out
+
 
 def _expand_plus_code(pc: Dict[str, Any]) -> Dict[str, Any]:
     out: Dict[str, Any] = {}
     if not isinstance(pc, dict):
         return out
-    out["pluscode_global"]   = pc.get("globalCode")
+    out["pluscode_global"] = pc.get("globalCode")
     out["pluscode_compound"] = pc.get("compoundCode")
     return out
 
 
-
 # --- main flattener --------------------------------------------------------
+
 
 def flatten_place(p: Dict[str, Any], fields: List[str]) -> Dict[str, Any]:
     """
     Flatten a Google Places (v1) result into analysis-friendly columns.
-    - Respects the requested `fields` list (expects 'places.*' names).
+    - Respects the requested `places.*` fields.
+    - Ignores response-level pagination metadata such as `nextPageToken`.
     - Expands common nested objects into dedicated columns.
     - Falls back to JSON strings for unknown dicts/lists.
     """
     out: Dict[str, Any] = {}
 
-    # Normalize field list (strip + ensure 'places.' prefix handling)
-    norm_fields = [f.strip() for f in fields if f and f.strip()]
-    # Provide a quick membership test that tolerates presence/absence of 'places.' prefix
+    # `nextPageToken` belongs to the Text Search response, not each Place object.
+    norm_fields = [
+        f.strip()
+        for f in fields
+        if f
+        and f.strip()
+        and f.strip() not in {"nextPageToken", "places.nextPageToken"}
+    ]
+
+    # Provide a quick membership test that tolerates presence/absence of 'places.' prefix.
     def _want(key: str) -> bool:
         return (key in norm_fields) or (("places." + key) in norm_fields)
 
     # --- straightforward scalar/known fields
-    if _want("id"):                    out["id"] = p.get("id")
-    if _want("name"):                  out["resource_name"] = p.get("name")  # e.g., 'places/...'
-    if _want("displayName"):           out["display_name"] = _get(p, "displayName.text")
-    if _want("formattedAddress"):      out["formatted_address"] = p.get("formattedAddress")
-    if _want("shortFormattedAddress"): out["short_address"] = p.get("shortFormattedAddress")
-    if _want("primaryType"):           out["primary_type"] = p.get("primaryType")
-    if _want("primaryTypeDisplayName"):out["primary_type_display"] = _get(p, "primaryTypeDisplayName.text")
-    if _want("internationalPhoneNumber"): out["phone"] = p.get("internationalPhoneNumber")
-    if _want("websiteUri"):            out["website"] = p.get("websiteUri")
-    if _want("googleMapsUri"):         out["gmap_url"] = p.get("googleMapsUri")
-    if _want("businessStatus"):        out["business_status"] = p.get("businessStatus")
-    if _want("pureServiceAreaBusiness"): out["is_service_area_only"] = p.get("pureServiceAreaBusiness")
+    if _want("id"):
+        out["id"] = p.get("id")
+    if _want("name"):
+        out["resource_name"] = p.get("name")  # e.g., 'places/...'
+    if _want("displayName"):
+        out["display_name"] = _get(p, "displayName.text")
+    if _want("formattedAddress"):
+        out["formatted_address"] = p.get("formattedAddress")
+    if _want("shortFormattedAddress"):
+        out["short_address"] = p.get("shortFormattedAddress")
+    if _want("primaryType"):
+        out["primary_type"] = p.get("primaryType")
+    if _want("primaryTypeDisplayName"):
+        out["primary_type_display"] = _get(p, "primaryTypeDisplayName.text")
+    if _want("internationalPhoneNumber"):
+        out["phone"] = p.get("internationalPhoneNumber")
+    if _want("websiteUri"):
+        out["website"] = p.get("websiteUri")
+    if _want("googleMapsUri"):
+        out["gmap_url"] = p.get("googleMapsUri")
+    if _want("businessStatus"):
+        out["business_status"] = p.get("businessStatus")
+    if _want("pureServiceAreaBusiness"):
+        out["is_service_area_only"] = p.get("pureServiceAreaBusiness")
 
     # rating + counts
-    if _want("rating"):            out["rating"] = p.get("rating")
-    if _want("userRatingCount"):   out["user_ratings_total"] = p.get("userRatingCount")
+    if _want("rating"):
+        out["rating"] = p.get("rating")
+    if _want("userRatingCount"):
+        out["user_ratings_total"] = p.get("userRatingCount")
 
     # types (list)
     if _want("types"):
@@ -175,7 +201,8 @@ def flatten_place(p: Dict[str, Any], fields: List[str]) -> Dict[str, Any]:
             names = []
             for c in cp:
                 nm = _get(c, "displayName.text") or c.get("id") or c.get("name")
-                if nm: names.append(nm)
+                if nm:
+                    names.append(nm)
             out["containing_places"] = _join(names, ";")
             if not names:
                 out["containing_places_json"] = _as_json(cp)
@@ -195,7 +222,8 @@ def flatten_place(p: Dict[str, Any], fields: List[str]) -> Dict[str, Any]:
             texts = []
             for r in revs[:3]:
                 txt = _get(r, "text.text") or _get(r, "originalText.text")
-                if txt: texts.append(txt.replace("\n", " ").strip())
+                if txt:
+                    texts.append(txt.replace("\n", " ").strip())
             out["reviews_sample"] = _join(texts, " || ")
             # keep raw JSON for full fidelity if needed downstream
             out["reviews_json"] = _as_json(revs)
@@ -207,24 +235,46 @@ def flatten_place(p: Dict[str, Any], fields: List[str]) -> Dict[str, Any]:
         # keep as JSON; structure varies
         out["review_summary_json"] = _as_json(rs)
 
-    # addressComponents sometimes requested + formattedAddress absent:
-    # already expanded; nothing else to do here.
-
-    # --- catch-all: for any requested field we didn’t explicitly expand,
-    #     provide a JSON column so nothing “vanishes”.
+    # --- catch-all: for any requested Place field we didn’t explicitly expand,
+    # provide a JSON column so nothing “vanishes”.
     requested_keys = {f.replace("places.", "") for f in norm_fields}
-    materialized = set(k for k in [
-        "id","name","displayName","formattedAddress","shortFormattedAddress","primaryType",
-        "primaryTypeDisplayName","internationalPhoneNumber","websiteUri","googleMapsUri",
-        "businessStatus","pureServiceAreaBusiness","rating","userRatingCount","types",
-        "location","viewport","plusCode","priceLevel","priceRange","currentOpeningHours",
-        "regularOpeningHours","containingPlaces","addressComponents","reviews","reviewSummary",
-    ] if _want(k))
-    for k in (requested_keys - materialized):
-        val = _get(p, k)
-        if isinstance(val, dict) or isinstance(val, list):
-            out[f"{k}_json"] = _as_json(val)
+    materialized = {
+        k
+        for k in [
+            "id",
+            "name",
+            "displayName",
+            "formattedAddress",
+            "shortFormattedAddress",
+            "primaryType",
+            "primaryTypeDisplayName",
+            "internationalPhoneNumber",
+            "websiteUri",
+            "googleMapsUri",
+            "businessStatus",
+            "pureServiceAreaBusiness",
+            "rating",
+            "userRatingCount",
+            "types",
+            "location",
+            "viewport",
+            "plusCode",
+            "priceLevel",
+            "priceRange",
+            "currentOpeningHours",
+            "regularOpeningHours",
+            "containingPlaces",
+            "addressComponents",
+            "reviews",
+            "reviewSummary",
+        ]
+        if _want(k)
+    }
+    for key in requested_keys - materialized:
+        val = _get(p, key)
+        if isinstance(val, (dict, list)):
+            out[f"{key}_json"] = _as_json(val)
         else:
-            out[k] = val
+            out[key] = val
 
     return out
