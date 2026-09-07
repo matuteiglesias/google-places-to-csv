@@ -21,12 +21,28 @@ class ProviderSpec:
 
 
 @dataclass(frozen=True)
+class GeoCircle:
+    latitude: float
+    longitude: float
+    radius_m: float
+
+    def __post_init__(self) -> None:
+        if not -90 <= self.latitude <= 90:
+            raise ValueError("latitude must be between -90 and 90")
+        if not -180 <= self.longitude <= 180:
+            raise ValueError("longitude must be between -180 and 180")
+        if self.radius_m < 0:
+            raise ValueError("radius_m must be >= 0")
+
+
+@dataclass(frozen=True)
 class DiscoveryRequest:
     query: str
     field_mask: str
     max_pages: int = 1
     language_code: str | None = None
     region_code: str | None = None
+    circle: GeoCircle | None = None
 
 
 class LocalBusinessProvider(Protocol):
@@ -64,6 +80,7 @@ GOOGLE_SPEC = ProviderSpec(
     durable_identifier="place_id",
     capabilities=(
         "text-search",
+        "circle-bias",
         "field-mask",
         "cost-preflight",
         "durable-id-handoff",
@@ -76,10 +93,22 @@ class GooglePlacesProvider:
     spec = GOOGLE_SPEC
 
     def search(self, request: DiscoveryRequest) -> list[Dict[str, Any]]:
+        location_bias = None
+        if request.circle is not None:
+            location_bias = {
+                "circle": {
+                    "center": {
+                        "latitude": request.circle.latitude,
+                        "longitude": request.circle.longitude,
+                    },
+                    "radius": request.circle.radius_m,
+                }
+            }
         return search_text(
             query=request.query,
             field_mask=request.field_mask,
             max_pages=request.max_pages,
+            location_bias=location_bias,
             language_code=request.language_code,
             region_code=request.region_code,
         )
