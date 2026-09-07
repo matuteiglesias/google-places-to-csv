@@ -26,9 +26,12 @@ jobs:
       - name: Smoke console surfaces
         run: |
           local-business-discover --help >/dev/null
+          local-business-census --help >/dev/null
+          local-business-census examples/census/website-leads-us-affluent.json --dry-run >/dev/null
           places-costcheck --profile core >/dev/null
       - name: Run offline tests
         env:
           GOOGLE_PLACES_API_KEY: ""
           GOOGLE_API_KEY: ""
+          OPENMART_API_KEY: ""
         run: python -m unittest discover -s tests -v
