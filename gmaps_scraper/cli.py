@@ -49,13 +49,19 @@ def build_parser() -> argparse.ArgumentParser:
     )
 
     parser.add_argument(
-        "--center",
-        help="Optional geographic bias center as LAT,LNG (for example -34.60,-58.38).",
+        "--latitude",
+        type=float,
+        help="Optional geographic bias center latitude.",
+    )
+    parser.add_argument(
+        "--longitude",
+        type=float,
+        help="Optional geographic bias center longitude.",
     )
     parser.add_argument(
         "--radius-m",
         type=float,
-        help="Radius in meters for --center. Google Text Search locationBias allows 0..50000.",
+        help="Radius in meters for latitude/longitude. Google Text Search allows 0..50000.",
     )
     parser.add_argument(
         "--output-contract",
@@ -88,16 +94,18 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
 
 
 def resolve_circle(args: argparse.Namespace) -> GeoCircle | None:
-    if args.center is None and args.radius_m is None:
+    geo_values = (args.latitude, args.longitude, args.radius_m)
+    if all(value is None for value in geo_values):
         return None
-    if args.center is None or args.radius_m is None:
-        raise SystemExit("--center and --radius-m must be provided together.")
+    if any(value is None for value in geo_values):
+        raise SystemExit(
+            "--latitude, --longitude, and --radius-m must be provided together."
+        )
 
     try:
-        raw_lat, raw_lng = [part.strip() for part in args.center.split(",", 1)]
         circle = GeoCircle(
-            latitude=float(raw_lat),
-            longitude=float(raw_lng),
+            latitude=float(args.latitude),
+            longitude=float(args.longitude),
             radius_m=float(args.radius_m),
         )
     except (ValueError, TypeError) as exc:
